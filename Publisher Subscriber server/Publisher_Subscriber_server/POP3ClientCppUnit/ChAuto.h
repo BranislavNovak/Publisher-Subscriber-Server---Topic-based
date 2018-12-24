@@ -5,10 +5,15 @@
 #include <fsmsystem.h>
 #include "../kernel/stdMsgpc16pl16.h"
 #include "NetFSM.h"
+
 //#pragma comment (lib, "Ws2_32.lib")
 
 #define SERVER_PORT 27015	// Port number of server that will be used for communication with clients
 #define BUFFER_SIZE 512		// Size of buffer that will be used for sending and receiving messages to clients
+#define TOPIC_BUFFER_SIZE 50
+#define FIRST_LETTER_OF_TOPIC 4
+#define PUBLISHED_DATA 200
+#define NUMBER_OF_TOPICS 20
 
 class ChAuto : public FiniteStateMachine {
 	
@@ -30,7 +35,8 @@ class ChAuto : public FiniteStateMachine {
 						FSM_Ch_Connecting,
 						FSM_Ch_Connected, 
 						FSM_Ch_Share_Data_on_Topic,
-						FSM_Ch_Store_Data };
+						FSM_Ch_Store_Data,
+						FSM_Ch_Share_All_Data_State};
 
 	//FSM_Ch_Idle
 	void	FSM_Ch_Idle_Cl_Connection_Request();
@@ -44,7 +50,8 @@ class ChAuto : public FiniteStateMachine {
 
 	void	FSM_Ch_Idle_Cl_Connected();
 	void	FSM_Ch_Idle_Cl_Failed();
-	void	FSM_Ch_Share_Data();
+	void	FSM_Ch_Share_All_Data();
+	void	FSM_Ch_Share_Topic_Data();
 	void	FSM_Ch_Store_Data_SubPub();
 		
 public:
@@ -56,10 +63,10 @@ public:
 
 	void Initialize();
 	void Start();
+	void getTopic(char* serverData, char* currentTopicTmp);
 	
 	// Checks if ip address belongs to IPv4 address family
 	bool is_ipV4_address();
-
 protected:
 	static DWORD WINAPI ClientListener(LPVOID);
 	

@@ -22,6 +22,7 @@ int main()
 {
     // Server address structure
     sockaddr_in6 serverAddress;
+	unsigned short clientPort;
 
     // Size of server address structure
 	int sockAddrLen = sizeof(serverAddress);
@@ -89,6 +90,35 @@ int main()
 			WSACleanup();
 			return 1;
 		}
+
+		printf("Received from server:\n");
+
+		iResult = recvfrom(clientSocket,						// Own socket
+			            dataBuffer,							// Buffer that will be used for receiving message
+						BUFFER_SIZE,							// Maximal size of buffer
+						0,									// No flags
+						(struct sockaddr *)&serverAddress,	// Client information from received message (ip address and port)
+						&sockAddrLen);
+
+		// Check if message is succesfully sent. If not, close client application
+		if (iResult == SOCKET_ERROR)
+		{
+			printf("sendto failed with error: %d\n", WSAGetLastError());
+			closesocket(clientSocket);
+			WSACleanup();
+			return 1;
+		}
+		char ipAddress[INET6_ADDRSTRLEN]; // INET6_ADDRSTRLEN 65 spaces for hexadecimal notation of IPv6
+		
+		clientPort = ntohs(serverAddress.sin6_port);
+		// Copy client ip to local char[]
+		inet_ntop(serverAddress.sin6_family, &serverAddress.sin6_addr, ipAddress, sizeof(ipAddress));
+        
+		// Convert port number from network byte order to host byte order
+		clientPort = ntohs(serverAddress.sin6_port);
+
+		printf("Hello from server to %s IpAddress, %d Port.\n", ipAddress, clientPort);
+
 	}
 	// Only for demonstration purpose
 	printf("Press any key to exit: ");

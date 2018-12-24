@@ -37,11 +37,14 @@ const uint16 MSG_Mail					= 0x0013;
 const uint16 MSG_User_Save_Mail			= 0x0015;
 const uint16 MSG_User_Disconnected		= 0x0014;
 
+
 // server messages
 const uint16 MSG_Notification				= 0x0016;	//First message from chAuto
 const uint16 MSG_Stay_Connected				= 0x0017;
 const uint16 MSG_Share_Data_on_Topic		= 0x0018;
 const uint16 MSG_Store_Data_on_Topic		= 0x0019;
+const uint16 MSG_Share_All_Data				= 0x0020;
+const uint16 MSG_Client_Message				= 0x0021;
 
 #define ADRESS "localhost"
 //#define ADRESS "mail.spymac.com"

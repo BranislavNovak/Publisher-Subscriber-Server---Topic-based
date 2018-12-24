@@ -51,6 +51,7 @@ void server::Initialize(){
 	SetState(FSM_Server_Idle);
 
 	InitEventProc(FSM_Server_Idle, MSG_Notification, (PROC_FUN_PTR)&server::FSM_Server_Idle_Receive_Msg);
+
 }
 
 void server::Start(){

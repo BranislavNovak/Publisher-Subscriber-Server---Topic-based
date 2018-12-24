@@ -4,6 +4,9 @@
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <map>
+#include <string>
+#include <iterator>
 #include "conio.h"
 
 #include "const.h"
@@ -14,20 +17,30 @@
 #pragma comment (lib, "AdvApi32.lib")
 
 // Buffer we will use to send and receive clients' messages
-    char dataBuffer[BUFFER_SIZE];
-	// WSADATA data structure that is to receive details of the Windows Sockets implementation
-    WSADATA wsaData;
-	// Declare and initialize client address that will be set from recvfrom
-    sockaddr_in6 clientAddress;
-	// Server address 
-    sockaddr_in6 serverAddress; 
+char dataBuffer[BUFFER_SIZE];
+// WSADATA data structure that is to receive details of the Windows Sockets implementation
+WSADATA wsaData;
+// Declare and initialize client address that will be set from recvfrom
+sockaddr_in6 clientAddress;
+// Server address 
+sockaddr_in6 serverAddress; 
+char client_message[BUFFER_SIZE];
+unsigned short clientPort;
 
-	int iResult;
-	SOCKET serverSocket;
+int iResult;
+SOCKET serverSocket;
+int publisherCounter = 3;
+int subscriberCounter = 0;
+
+char topic1[PUBLISHED_DATA] = "WEATHER: Belgrace 8C  New York 3C  London 9C  Tokyo 5C  Moscow -9C";
+char topic2[PUBLISHED_DATA] = "FOOTBALL: France 4:2 Croatia  Belgium 2:0 England  Germany 2:1 Sweden  Japan 2:2 Senegal";
+char topic3[PUBLISHED_DATA] = "INTEL_CPU: i3=180$  i5=290$  i7=430$  i9=1480$";
+char topic4[PUBLISHED_DATA] = "COLLEGES_IN_AMERICA: Stanford  Harvard  Princeton  Yale  Duke";
+char* allServerData[NUMBER_OF_TOPICS] = {topic1, topic2, topic3, topic4};
 
 #define StandardMessageCoding 0x00
 
-ChAuto::ChAuto() : FiniteStateMachine(CH_AUTOMATE_TYPE_ID, CH_AUTOMATE_MBX_ID, 1, 5, 3) {
+ChAuto::ChAuto() : FiniteStateMachine(CH_AUTOMATE_TYPE_ID, CH_AUTOMATE_MBX_ID, 1, 6, 3) {
 }
 
 ChAuto::~ChAuto() {
@@ -76,12 +89,9 @@ void ChAuto::Initialize() {
 	InitEventProc(FSM_Ch_Idle ,MSG_Channel_Connection_Failed, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Failed);
 	InitEventProc(FSM_Ch_Connected ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);
 	InitEventProc(FSM_Ch_Connected ,MSG_Store_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Store_Data_SubPub);
-	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_Data);
+	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_Topic_Data);
+	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_All_Data, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_All_Data);
 	InitEventProc(FSM_Ch_Share_Data_on_Topic ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);
-
-	InitEventProc(FSM_Ch_Connecting ,TIMER1_EXPIRED, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Connecting_TIMER1_EXPIRED );
-	InitEventProc(FSM_Ch_Connecting ,MSG_Sock_Connection_Acccept, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Connecting_Sock_Connection_Acccept );
-	InitEventProc(FSM_Ch_Connected ,MSG_Sock_Disconected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Connected_Sock_Disconected );
 
 	InitTimerBlock(TIMER1_ID, TIMER1_COUNT, TIMER1_EXPIRED);
 }
@@ -186,22 +196,11 @@ void ChAuto::FSM_Ch_Idle_Cl_Connected(){
 	inet_ntop(clientAddress.sin6_family, &clientAddress.sin6_addr, ipAddress, sizeof(ipAddress));
         
 	// Convert port number from network byte order to host byte order
-    unsigned short clientPort = ntohs(clientAddress.sin6_port);
+    clientPort = ntohs(clientAddress.sin6_port);
 
-	bool isIPv4 = is_ipV4_address(); //true for IPv4 and false for IPv6
+	printf("IPv6 Client connected from ip: %s, port: %d, sent: %s.\n", ipAddress, clientPort, dataBuffer);
+		    
 
-	if(isIPv4){
-		char ipAddress1[15]; // 15 spaces for decimal notation (for example: "192.168.100.200") + '\0'
-		struct in_addr *ipv4 = (struct in_addr*)&((char*)&clientAddress.sin6_addr.u)[12]; 
-			
-		// Copy client ip to local char[]
-		strcpy_s(ipAddress1, sizeof(ipAddress1), inet_ntoa( *ipv4 ));
-		printf("IPv4 Client connected from ip: %s, port: %d, sent: %s.\n", ipAddress1, clientPort, dataBuffer);
-	}else
-		printf("IPv6 Client connected from ip: %s, port: %d, sent: %s.\n", ipAddress, clientPort, dataBuffer);
-		
-	// Possible server-shutdown logic could be put here
-    
 	PrepareNewMessage(0x00, MSG_Store_Data_on_Topic);
 	SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
 	SetMsgObjectNumberTo(0);
@@ -211,6 +210,55 @@ void ChAuto::FSM_Ch_Idle_Cl_Connected(){
 void ChAuto::FSM_Ch_Store_Data_SubPub(){
 	SetState(FSM_Ch_Store_Data);
 
+	char dataFromClient[BUFFER_SIZE];
+	char currentTopic[TOPIC_BUFFER_SIZE];
+	char publishMessageTmp[BUFFER_SIZE];
+
+	strcpy(dataFromClient, dataBuffer);
+	
+	
+	if(dataFromClient[0] == 'P' && dataFromClient[1] == 'U' && dataFromClient[2] == 'B'){
+		int i = FIRST_LETTER_OF_TOPIC;	
+		int j = 0, k = 0;
+		while(dataFromClient[i] != ' '){
+			currentTopic[j++] = dataFromClient[i++];
+		}
+		j = 0;
+
+		while(dataFromClient[i] != '\0'){
+			publishMessageTmp[j++] = dataFromClient[i++];
+		}
+
+		for(j = 0; j < publisherCounter; j++){
+			char topicTmp[TOPIC_BUFFER_SIZE];
+			getTopic(allServerData[j], topicTmp);
+
+			if(!strcmp(currentTopic, topicTmp)){
+				printf("Topic already exists!\n");
+			}
+		}
+
+		char tmpOnCurrentTopicData[PUBLISHED_DATA];
+		int tmp = 0;
+		for(j = 0; j < strlen(currentTopic); j++){
+			tmpOnCurrentTopicData[tmp++] = currentTopic[j];
+		}
+		tmpOnCurrentTopicData[tmp++] = ':';
+		tmpOnCurrentTopicData[tmp++] = ' ';
+
+		for(j = 0; j < strlen(publishMessageTmp); j++){
+			tmpOnCurrentTopicData[tmp++] = publishMessageTmp[j];
+		}
+
+		allServerData[publisherCounter++] = tmpOnCurrentTopicData;
+
+	}else if(dataFromClient[0] == 'S' && dataFromClient[1] == 'U' && dataFromClient[2] == 'B'){
+		printf("Here I will send data on currentTopic!\n");
+
+	}else if(dataFromClient[0] == 'L' && dataFromClient[1] == 'I' && dataFromClient[2] == 'S' && dataFromClient[3] == 'T'){
+		printf("Here I will send whole list of topics!\n");
+
+	}
 
 	PrepareNewMessage(0x00, MSG_Share_Data_on_Topic);
 	SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
@@ -218,14 +266,34 @@ void ChAuto::FSM_Ch_Store_Data_SubPub(){
 	SendMessage(CH_AUTOMATE_MBX_ID);
 }
 
-void ChAuto::FSM_Ch_Share_Data(){
+void ChAuto::FSM_Ch_Share_Topic_Data(){
 	SetState(FSM_Ch_Share_Data_on_Topic);
 
+	iResult = sendto(serverSocket,						// Own socket
+						 dataBuffer,						// Text of message
+						 strlen(dataBuffer),				// Message size
+						 0,									// No flags
+						 (SOCKADDR *)&clientAddress,		// Address structure of server (type, IP address and port)
+						 sizeof(clientAddress));			// Size of sockadr_in structure
+
+		// Check if message is succesfully sent. If not, close client application
+		if (iResult == SOCKET_ERROR)
+		{
+			printf("sendto failed with error: %d\n", WSAGetLastError());
+			closesocket(serverSocket);
+			WSACleanup();
+			return;
+		}
 
 	PrepareNewMessage(0x00, MSG_Stay_Connected);
 	SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
 	SetMsgObjectNumberTo(0);
 	SendMessage(CH_AUTOMATE_MBX_ID);
+}
+
+
+void ChAuto::FSM_Ch_Share_All_Data(){
+	SetState(FSM_Ch_Share_All_Data_State);
 }
 
 void ChAuto::FSM_Ch_Idle_Cl_Failed(){
@@ -305,17 +373,9 @@ DWORD ChAuto::ClientListener(LPVOID param) {
 	return 1;
 }
 
-bool ChAuto::is_ipV4_address()
-{
-	sockaddr_in6 address = clientAddress;
-	char *check = (char*)&address.sin6_addr.u;
-
-	for (int i = 0; i < 10; i++)
-		if(check[i] != 0)
-			return false;
-		
-	if(check[10] != -1 || check[11] != -1)
-		return false;
-
-	return true;
+void ChAuto::getTopic(char* serverData, char* currentTopicTmp){
+	int i = 0, j = 0;
+	while(serverData[i] != ':'){
+		currentTopicTmp[j++] = serverData[i++];
+	}
 }
