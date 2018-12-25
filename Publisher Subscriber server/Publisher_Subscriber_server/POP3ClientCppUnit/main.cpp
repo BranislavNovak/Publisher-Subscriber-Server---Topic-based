@@ -70,6 +70,4 @@ void mainProgram(int argc, char* argv[]) {
 
 	/* Free the thread handle */
 	CloseHandle(thread_handle);
-
-
 }
