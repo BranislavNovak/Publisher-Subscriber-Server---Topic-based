@@ -1,8 +1,8 @@
-﻿Build started 25-Dec-18 01:53:36.
-     1>Project "C:\Users\Branislav Novak\Desktop\Publisher_Subscriber_Server\Publisher-Subscriber-Server---Topic-based\Publisher Subscriber client\Client_IPv6\Client_IPv6.vcxproj" on node 2 (clean target(s)).
+﻿Build started 25.12.2018 14:39:36.
+     1>Project "D:\MRKiRM1 - PUB_SUB_Server\Publisher-Subscriber-Server---Topic-based\Publisher Subscriber client\Client_IPv6\Client_IPv6.vcxproj" on node 2 (clean target(s)).
      1>_PrepareForClean:
          Deleting file "Debug\Client_IPv6.lastbuildstate".
-     1>Done Building Project "C:\Users\Branislav Novak\Desktop\Publisher_Subscriber_Server\Publisher-Subscriber-Server---Topic-based\Publisher Subscriber client\Client_IPv6\Client_IPv6.vcxproj" (clean target(s)).
+     1>Done Building Project "D:\MRKiRM1 - PUB_SUB_Server\Publisher-Subscriber-Server---Topic-based\Publisher Subscriber client\Client_IPv6\Client_IPv6.vcxproj" (clean target(s)).
 
 Build succeeded.
 

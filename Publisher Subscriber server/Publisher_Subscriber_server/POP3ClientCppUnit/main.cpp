@@ -6,9 +6,6 @@
 #include "fsmsystem.h"
 #include "logfile.h"
 #include "ChAuto.h"
-//#include "ClAuto.h"
-//#include "UserAuto.h"
-#include "server.h"
 
 bool g_ProgramEnd;
 
@@ -21,15 +18,14 @@ static FSMSystem sys(AUTOMAT_COUNT, MSGBOX_COUNT);
 
 DWORD WINAPI SystemThread(void *data) {
 	ChAuto Channel;
-	server Server;
-
+	
 	/* Kernel buffer description block */
 	/* number of buffer types */
-	const uint8 buffClassNo =  2; 
+	const uint8 buffClassNo =  1; 
 	/* number of buffers of each buffer type */
-	uint32 buffsCount[buffClassNo] = { 50, 50}; 
+	uint32 buffsCount[buffClassNo] = {50}; 
 	/* buffer size for each buffer type */
- 	uint32 buffsLength[buffClassNo] = { 256, 256}; 
+ 	uint32 buffsLength[buffClassNo] = { 256}; 
 	
 	/* Logging setting - to a file in this case */
 	LogFile lf("log.log" /*log file name*/, "./log.ini" /* message translator file */);
@@ -37,12 +33,11 @@ DWORD WINAPI SystemThread(void *data) {
 
 	/* Mandatory kernel initialization */
 	printf("[*] Initializing system...\n");
-	sys.InitKernel(buffClassNo, buffsCount, buffsLength, 2, Timer1s);
+	sys.InitKernel(buffClassNo, buffsCount, buffsLength, 1, Timer1s);
 
 	/* Add automates to the system */
 	sys.Add(&Channel, CH_AUTOMATE_TYPE_ID, 1, true);
-	sys.Add(&Server, SERVER_AUTOMATE_TYPE_ID, 1, true);
-
+	
 	printf("[*] Starting system...\n");
 
 	/* Start the first automate - usually it sends the first message, 

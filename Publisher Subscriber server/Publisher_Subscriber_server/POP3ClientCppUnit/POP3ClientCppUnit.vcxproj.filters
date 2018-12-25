@@ -113,9 +113,6 @@
     <ClInclude Include="..\Kernel\UdpLogInterface.h">
       <Filter>kernel</Filter>
     </ClInclude>
-    <ClInclude Include="server.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ChAuto.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -210,9 +207,6 @@
     </ClCompile>
     <ClCompile Include="..\Kernel\UdpLogInterface.cpp">
       <Filter>kernel</Filter>
-    </ClCompile>
-    <ClCompile Include="server.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -26,24 +26,28 @@ sockaddr_in6 clientAddress;
 sockaddr_in6 serverAddress; 
 unsigned short clientPort;
 
-int iResult;
 SOCKET serverSocket;
+int iResult;
 int publisherCounter = 4;
 int subscriberCounter = 0;
+int alreadyexists = 0;
+int index = 0;
 
-char currentTopic[TOPIC_BUFFER_SIZE];
 char ackMessage[PUBLISHED_DATA] = "Topic added successfully!`";
 char topic1[PUBLISHED_DATA] = "WEATHER: Belgrace 8C  New York 3C  London 9C  Tokyo 5C  Moscow -9C`";
 char topic2[PUBLISHED_DATA] = "FOOTBALL: France 4:2 Croatia  Belgium 2:0 England  Germany 2:1 Sweden  Japan 2:2 Senegal`";
 char topic3[PUBLISHED_DATA] = "INTEL_CPU: i3=180$  i5=290$  i7=430$  i9=1480$`";
 char topic4[PUBLISHED_DATA] = "COLLEGES_IN_AMERICA: Stanford  Harvard  Princeton  Yale  Duke`";
+
+// A buffer that will store all topics.
 char* allServerData[NUMBER_OF_TOPICS];
 
 char tmpOnCurrentTopicData[MAX_PUBLISHERS][PUBLISHED_DATA];
+char currentTopic[TOPIC_BUFFER_SIZE];
 
 #define StandardMessageCoding 0x00
 
-ChAuto::ChAuto() : FiniteStateMachine(CH_AUTOMATE_TYPE_ID, CH_AUTOMATE_MBX_ID, 1, 7, 4) {
+ChAuto::ChAuto() : FiniteStateMachine(CH_AUTOMATE_TYPE_ID, CH_AUTOMATE_MBX_ID, 1, 6, 3) {
 }
 
 ChAuto::~ChAuto() {
@@ -90,17 +94,20 @@ void ChAuto::Initialize() {
 	//intitialization message handlers
 	InitEventProc(FSM_Ch_Idle ,MSG_Channel_Wait_Cl_Message, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);			// FSM_Ch_Idle						-> (MSG_Channel_Wait_Cl_Message)	-> FSM_Ch_Idle_Cl_Connected
 	InitEventProc(FSM_Ch_Idle ,MSG_Channel_Connection_Failed, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Failed);			// FSM_Ch_Idle						-> (MSG_Channel_Connection_Failed)	-> FSM_Ch_Idle_Cl_Failed
+	
 	InitEventProc(FSM_Ch_Connected ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);				// FSM_Ch_Connected					-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
 	InitEventProc(FSM_Ch_Connected ,MSG_Store_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Store_Data_SubPub);			// FSM_Ch_Connected					-> (MSG_Store_Data_on_Topic)		-> FSM_Ch_Store_Data_SubPub
+	
 	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_Topic_Data);			// FSM_Ch_Store_Data				-> (MSG_Share_Data_on_Topic)		-> FSM_Ch_Share_Topic_Data
 	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_All_Topics, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_All_Topics);				// FSM_Ch_Store_Data				-> (MSG_Share_All_Topics)			-> FSM_Ch_Share_All_Topics
-	InitEventProc(FSM_Ch_Store_Data ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);				// FSM_Ch_Store_Data				-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
 	InitEventProc(FSM_Ch_Store_Data ,MSG_ACK_Notification, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Publish_ACK);					// FSM_Ch_Store_Data				-> (MSG_ACK_Notification)			-> FSM_Ch_Publish_ACK
+	
 	InitEventProc(FSM_Ch_Publish_ACK_State ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);		// FSM_Ch_Publish_ACK_State			-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
+	
 	InitEventProc(FSM_Ch_Share_All_Topics_State , MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);	// FSM_Ch_Share_All_Topics_State	-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
+	
 	InitEventProc(FSM_Ch_Share_Data_on_Topic ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);		// FSM_Ch_Share_Data_on_Topic		-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
 
-	InitTimerBlock(TIMER1_ID, TIMER1_COUNT, TIMER1_EXPIRED);
 }
 
 void ChAuto::Start(){
@@ -240,6 +247,18 @@ void ChAuto::FSM_Ch_Store_Data_SubPub(){
 		currentTopic[j] = '\0';
 		j = 0;
 		i++;
+		
+		for(j = 0; j < publisherCounter; j++){
+			char topicTmp[TOPIC_BUFFER_SIZE];
+			getTopic(allServerData[j], topicTmp);
+
+			if(!strcmp(currentTopic, topicTmp)){
+				printf("Topic already exists!\n");
+				alreadyexists = 1;
+				index = j;
+				break;
+			}
+		}
 
 		for(k = 0; k < strlen(dataFromClient); k++){
 			publishMessageTmp[k] = dataFromClient[i++];
@@ -262,8 +281,21 @@ void ChAuto::FSM_Ch_Store_Data_SubPub(){
 		}
 		tmpOnCurrentTopicData[publisherCounter][tmp] = '\0';
 
-		allServerData[publisherCounter] = tmpOnCurrentTopicData[publisherCounter];
-		publisherCounter++;
+		if(!alreadyexists){
+			allServerData[publisherCounter] = tmpOnCurrentTopicData[publisherCounter];
+			publisherCounter++;
+		}else{
+			int m;
+			int dataSize = (strlen(publishMessageTmp));
+			int existingSize = strlen(allServerData[index]);
+			allServerData[index][existingSize - 1] = ' ';
+			for(m = 0; m < dataSize; m++){
+				allServerData[index][existingSize+m] = publishMessageTmp[m]; 
+			}
+			allServerData[index][existingSize+strlen(publishMessageTmp)] = '`';
+			//allServerData[index][existingSize+strlen(publishMessageTmp)+1] = '\0';
+			alreadyexists = 0;
+		}
 
 		PrepareNewMessage(0x00, MSG_ACK_Notification);
 		SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
@@ -440,82 +472,10 @@ void ChAuto::FSM_Ch_Idle_Cl_Failed(){
 	SetState(FSM_Ch_Idle);
 }
 
-void ChAuto::FSM_Ch_Idle_Cl_Connection_Request(){
-}
-
-
-
-void ChAuto::FSM_Ch_Connecting_TIMER1_EXPIRED(){
-
-	/*PrepareNewMessage(0x00, MSG_Cl_Connection_Reject);
-	SetMsgToAutomate(CL_AUTOMATE_TYPE_ID);
-	SetMsgObjectNumberTo(0);
-	SendMessage(CL_AUTOMATE_MBX_ID);
-
-	SetState(FSM_Ch_Idle);*/
-
-}
-void ChAuto::FSM_Ch_Connecting_Sock_Connection_Acccept(){
-
-	/*PrepareNewMessage(0x00, MSG_Cl_Connection_Accept);
-	SetMsgToAutomate(CL_AUTOMATE_TYPE_ID);
-	SetMsgObjectNumberTo(0);
-	SendMessage(CL_AUTOMATE_MBX_ID);
-
-	StopTimer(TIMER1_ID);
-
-	SetState(FSM_Ch_Connected);*/
-
-}
-void ChAuto::FSM_Ch_Connected_Cl_MSG(){
-
-	char* data = new char[255];
-	uint8* buffer = GetParam(PARAM_DATA);
-	uint16 size = buffer[2];
-
-	memcpy(data,buffer + 4,size);
-
-	data[size] = 0;
-	if (send(m_Socket, data, size, 0) != size) {
-		delete [] data;
-	} else {
-		printf("SENT: %s",data);
-		delete [] data;
-	}
-
-}
-void ChAuto::FSM_Ch_Connected_Sock_MSG(){
-
-}
-
-void ChAuto::FSM_Ch_Connected_Sock_Disconected(){
-
-	/*PrepareNewMessage(0x00, MSG_Cl_Disconected);
-	SetMsgToAutomate(CL_AUTOMATE_TYPE_ID);
-	SetMsgObjectNumberTo(0);
-	SendMessage(CL_AUTOMATE_MBX_ID);
-
-	SetState(FSM_Ch_Idle);*/
-
-}
-
-void ChAuto::NetMsg_2_FSMMsg(const char* apBuffer, uint16 anBufferLength) {
-	
-	/*PrepareNewMessage(0x00, MSG_MSG);
-	SetMsgToAutomate(CL_AUTOMATE_TYPE_ID);
-	SetMsgObjectNumberTo(0);
-	AddParam(PARAM_DATA,anBufferLength,(uint8 *)apBuffer);
-	SendMessage(CL_AUTOMATE_MBX_ID);*/
-	
-}
-
-DWORD ChAuto::ClientListener(LPVOID param) {
-	return 1;
-}
-
 void ChAuto::getTopic(char* serverData, char* currentTopicTmp){
 	int i = 0, j = 0;
 	while(serverData[i] != ':'){
 		currentTopicTmp[j++] = serverData[i++];
 	}
+	currentTopicTmp[j] = '\0';
 }

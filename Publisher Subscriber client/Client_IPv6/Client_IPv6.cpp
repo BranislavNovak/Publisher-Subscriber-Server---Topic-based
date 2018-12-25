@@ -67,6 +67,10 @@ int main()
         return 1;
     }
 	
+	printf("Type in message following  one of the possible patterns (without [ ]):"
+			"\n1. PUB [TOPIC] [NewData]	--> Publish data on topic!"
+			"\n2. SUB [TOPIC]			--> Subscribe on specified topic!"
+			"\n3. LIST				--> Show all existing topics!");
 	while(1)
 	{
 		printf("\n-----> Enter message to send: ");
