@@ -24,23 +24,26 @@ WSADATA wsaData;
 sockaddr_in6 clientAddress;
 // Server address 
 sockaddr_in6 serverAddress; 
-char client_message[BUFFER_SIZE];
 unsigned short clientPort;
 
 int iResult;
 SOCKET serverSocket;
-int publisherCounter = 3;
+int publisherCounter = 4;
 int subscriberCounter = 0;
 
-char topic1[PUBLISHED_DATA] = "WEATHER: Belgrace 8C  New York 3C  London 9C  Tokyo 5C  Moscow -9C";
-char topic2[PUBLISHED_DATA] = "FOOTBALL: France 4:2 Croatia  Belgium 2:0 England  Germany 2:1 Sweden  Japan 2:2 Senegal";
-char topic3[PUBLISHED_DATA] = "INTEL_CPU: i3=180$  i5=290$  i7=430$  i9=1480$";
-char topic4[PUBLISHED_DATA] = "COLLEGES_IN_AMERICA: Stanford  Harvard  Princeton  Yale  Duke";
-char* allServerData[NUMBER_OF_TOPICS] = {topic1, topic2, topic3, topic4};
+char currentTopic[TOPIC_BUFFER_SIZE];
+char ackMessage[PUBLISHED_DATA] = "Topic added successfully!`";
+char topic1[PUBLISHED_DATA] = "WEATHER: Belgrace 8C  New York 3C  London 9C  Tokyo 5C  Moscow -9C`";
+char topic2[PUBLISHED_DATA] = "FOOTBALL: France 4:2 Croatia  Belgium 2:0 England  Germany 2:1 Sweden  Japan 2:2 Senegal`";
+char topic3[PUBLISHED_DATA] = "INTEL_CPU: i3=180$  i5=290$  i7=430$  i9=1480$`";
+char topic4[PUBLISHED_DATA] = "COLLEGES_IN_AMERICA: Stanford  Harvard  Princeton  Yale  Duke`";
+char* allServerData[NUMBER_OF_TOPICS];
+
+char tmpOnCurrentTopicData[MAX_PUBLISHERS][PUBLISHED_DATA];
 
 #define StandardMessageCoding 0x00
 
-ChAuto::ChAuto() : FiniteStateMachine(CH_AUTOMATE_TYPE_ID, CH_AUTOMATE_MBX_ID, 1, 6, 3) {
+ChAuto::ChAuto() : FiniteStateMachine(CH_AUTOMATE_TYPE_ID, CH_AUTOMATE_MBX_ID, 1, 7, 4) {
 }
 
 ChAuto::~ChAuto() {
@@ -85,19 +88,29 @@ void ChAuto::Initialize() {
 	SetState(FSM_Ch_Idle);	
 	
 	//intitialization message handlers
-	InitEventProc(FSM_Ch_Idle ,MSG_Channel_Wait_Cl_Message, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);
-	InitEventProc(FSM_Ch_Idle ,MSG_Channel_Connection_Failed, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Failed);
-	InitEventProc(FSM_Ch_Connected ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);
-	InitEventProc(FSM_Ch_Connected ,MSG_Store_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Store_Data_SubPub);
-	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_Topic_Data);
-	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_All_Data, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_All_Data);
-	InitEventProc(FSM_Ch_Share_Data_on_Topic ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);
+	InitEventProc(FSM_Ch_Idle ,MSG_Channel_Wait_Cl_Message, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);			// FSM_Ch_Idle						-> (MSG_Channel_Wait_Cl_Message)	-> FSM_Ch_Idle_Cl_Connected
+	InitEventProc(FSM_Ch_Idle ,MSG_Channel_Connection_Failed, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Failed);			// FSM_Ch_Idle						-> (MSG_Channel_Connection_Failed)	-> FSM_Ch_Idle_Cl_Failed
+	InitEventProc(FSM_Ch_Connected ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);				// FSM_Ch_Connected					-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
+	InitEventProc(FSM_Ch_Connected ,MSG_Store_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Store_Data_SubPub);			// FSM_Ch_Connected					-> (MSG_Store_Data_on_Topic)		-> FSM_Ch_Store_Data_SubPub
+	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_Data_on_Topic, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_Topic_Data);			// FSM_Ch_Store_Data				-> (MSG_Share_Data_on_Topic)		-> FSM_Ch_Share_Topic_Data
+	InitEventProc(FSM_Ch_Store_Data ,MSG_Share_All_Topics, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Share_All_Topics);				// FSM_Ch_Store_Data				-> (MSG_Share_All_Topics)			-> FSM_Ch_Share_All_Topics
+	InitEventProc(FSM_Ch_Store_Data ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);				// FSM_Ch_Store_Data				-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
+	InitEventProc(FSM_Ch_Store_Data ,MSG_ACK_Notification, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Publish_ACK);					// FSM_Ch_Store_Data				-> (MSG_ACK_Notification)			-> FSM_Ch_Publish_ACK
+	InitEventProc(FSM_Ch_Publish_ACK_State ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);		// FSM_Ch_Publish_ACK_State			-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
+	InitEventProc(FSM_Ch_Share_All_Topics_State , MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);	// FSM_Ch_Share_All_Topics_State	-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
+	InitEventProc(FSM_Ch_Share_Data_on_Topic ,MSG_Stay_Connected, (PROC_FUN_PTR)&ChAuto::FSM_Ch_Idle_Cl_Connected);		// FSM_Ch_Share_Data_on_Topic		-> (MSG_Stay_Connected)				-> FSM_Ch_Idle_Cl_Connected
 
 	InitTimerBlock(TIMER1_ID, TIMER1_COUNT, TIMER1_EXPIRED);
 }
 
 void ChAuto::Start(){
 	SetState(FSM_Ch_Idle);
+
+	// Fill AllServerData with topics
+	allServerData[0] = topic1;
+	allServerData[1] = topic2;
+	allServerData[2] = topic3;
+	allServerData[3] = topic4;
 
 	// Initialize windows sockets library for this process
     if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0)
@@ -167,7 +180,7 @@ void ChAuto::Start(){
 void ChAuto::FSM_Ch_Idle_Cl_Connected(){
 	 
 	SetState(FSM_Ch_Connected);
-
+	
 	memset(&clientAddress, 0, sizeof(clientAddress));
 
 	// Set whole buffer to zero
@@ -179,11 +192,11 @@ void ChAuto::FSM_Ch_Idle_Cl_Connected(){
 	// Receive client message
     iResult = recvfrom(serverSocket,						// Own socket
 			            dataBuffer,							// Buffer that will be used for receiving message
-						BUFFER_SIZE,							// Maximal size of buffer
+						BUFFER_SIZE,						// Maximal size of buffer
 						0,									// No flags
 						(struct sockaddr *)&clientAddress,	// Client information from received message (ip address and port)
 						&sockAddrLen);						// Size of sockadd_in structure
-		
+
 	// Check if message is succesfully received
 	if (iResult == SOCKET_ERROR)
 	{
@@ -211,67 +224,119 @@ void ChAuto::FSM_Ch_Store_Data_SubPub(){
 	SetState(FSM_Ch_Store_Data);
 
 	char dataFromClient[BUFFER_SIZE];
-	char currentTopic[TOPIC_BUFFER_SIZE];
 	char publishMessageTmp[BUFFER_SIZE];
 
 	strcpy(dataFromClient, dataBuffer);
-	
-	
+
+	// If client is PUBLISHER
+	// Expected message: PUB [topic] [...data on topic...]
 	if(dataFromClient[0] == 'P' && dataFromClient[1] == 'U' && dataFromClient[2] == 'B'){
+		printf("\nPUBLISHER recognized!\n");
 		int i = FIRST_LETTER_OF_TOPIC;	
 		int j = 0, k = 0;
 		while(dataFromClient[i] != ' '){
 			currentTopic[j++] = dataFromClient[i++];
 		}
+		currentTopic[j] = '\0';
 		j = 0;
+		i++;
 
-		while(dataFromClient[i] != '\0'){
-			publishMessageTmp[j++] = dataFromClient[i++];
+		for(k = 0; k < strlen(dataFromClient); k++){
+			publishMessageTmp[k] = dataFromClient[i++];
 		}
 
-		for(j = 0; j < publisherCounter; j++){
-			char topicTmp[TOPIC_BUFFER_SIZE];
-			getTopic(allServerData[j], topicTmp);
-
-			if(!strcmp(currentTopic, topicTmp)){
-				printf("Topic already exists!\n");
-			}
-		}
-
-		char tmpOnCurrentTopicData[PUBLISHED_DATA];
 		int tmp = 0;
 		for(j = 0; j < strlen(currentTopic); j++){
-			tmpOnCurrentTopicData[tmp++] = currentTopic[j];
+			if(currentTopic[j] < 'A' || currentTopic[j] > 'Z'){
+				break;
+			}else{
+				tmpOnCurrentTopicData[publisherCounter][tmp++] = currentTopic[j];
+			}
 		}
-		tmpOnCurrentTopicData[tmp++] = ':';
-		tmpOnCurrentTopicData[tmp++] = ' ';
+		tmpOnCurrentTopicData[publisherCounter][tmp++] = ':';
+		tmpOnCurrentTopicData[publisherCounter][tmp++] = ' ';
 
-		for(j = 0; j < strlen(publishMessageTmp); j++){
-			tmpOnCurrentTopicData[tmp++] = publishMessageTmp[j];
+		j = 0;
+		while(publishMessageTmp[j] != '\0'){
+			tmpOnCurrentTopicData[publisherCounter][tmp++] = publishMessageTmp[j++];
 		}
+		tmpOnCurrentTopicData[publisherCounter][tmp] = '\0';
 
-		allServerData[publisherCounter++] = tmpOnCurrentTopicData;
+		allServerData[publisherCounter] = tmpOnCurrentTopicData[publisherCounter];
+		publisherCounter++;
 
-	}else if(dataFromClient[0] == 'S' && dataFromClient[1] == 'U' && dataFromClient[2] == 'B'){
-		printf("Here I will send data on currentTopic!\n");
-
-	}else if(dataFromClient[0] == 'L' && dataFromClient[1] == 'I' && dataFromClient[2] == 'S' && dataFromClient[3] == 'T'){
-		printf("Here I will send whole list of topics!\n");
-
+		PrepareNewMessage(0x00, MSG_ACK_Notification);
+		SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
+		SetMsgObjectNumberTo(0);
+		SendMessage(CH_AUTOMATE_MBX_ID);
 	}
-
-	PrepareNewMessage(0x00, MSG_Share_Data_on_Topic);
-	SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
-	SetMsgObjectNumberTo(0);
-	SendMessage(CH_AUTOMATE_MBX_ID);
+	// If client is SUBSCRIBER
+	// Expected message: SUB [topic]
+	else if(dataFromClient[0] == 'S' && dataFromClient[1] == 'U' && dataFromClient[2] == 'B'){
+		printf("\nSUBSCRIBER recognized!\n\n");
+		int i = FIRST_LETTER_OF_TOPIC;	
+		int j = 0, k = 0;
+		while(dataFromClient[i] != '\0'){
+			currentTopic[j++] = dataFromClient[i++];
+		}
+		currentTopic[j] = '\0';
+		
+		PrepareNewMessage(0x00, MSG_Share_Data_on_Topic);
+		SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
+		SetMsgObjectNumberTo(0);
+		SendMessage(CH_AUTOMATE_MBX_ID);
+	}
+	// Any client can ask for existing list of topics
+	// Expected message: LIST
+	else if(dataFromClient[0] == 'L' && dataFromClient[1] == 'I' && dataFromClient[2] == 'S' && dataFromClient[3] == 'T'){
+		PrepareNewMessage(0x00, MSG_Share_All_Topics);
+		SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
+		SetMsgObjectNumberTo(0);
+		SendMessage(CH_AUTOMATE_MBX_ID);
+	}
 }
 
 void ChAuto::FSM_Ch_Share_Topic_Data(){
 	SetState(FSM_Ch_Share_Data_on_Topic);
 
-	iResult = sendto(serverSocket,						// Own socket
-						 dataBuffer,						// Text of message
-						 strlen(dataBuffer),				// Message size
+	char onTopicData[BUFFER_SIZE];
+	char tmpTopic[TOPIC_BUFFER_SIZE];
+	char tmpCurrentTopic[TOPIC_BUFFER_SIZE];
+	int i, j, done = 0, finished = 0, k = 0, n = 0, eq = 1;
+	
+	for(i = 0; i < publisherCounter; i++){	
+		if(done) break;
+		for(j = 0; j < strlen(allServerData[i]); j++){				// On each data
+			if((allServerData[i])[j] != ':' && !finished){			// Until ':' is reached
+				if((allServerData[i])[j] != currentTopic[k++]){		// Compare content of allServerData[i] and currentTopic
+					eq = 0;											// If not equal, it means that allServerData[i] is not correct one				
+					k = 0;
+					break;
+				}else{
+					eq = 1;
+				}
+			}else if((allServerData[i])[j] == ':'){
+				eq = 1;
+				finished = 1;
+			}
+			if(eq){													// If topic found in data is equal to currnetTopic
+				
+				onTopicData[n] = (allServerData[i])[j];				// Until next caracter isn't first of next topic
+				if(onTopicData[n] == '`'){
+					done = 1;
+					break;
+				}
+				n++;
+			}
+		}
+	}
+
+	onTopicData[n++] = '`';									// Caracter which will be used to adress the end of message
+	onTopicData[n]	 = '\0';
+
+	iResult = sendto(serverSocket,							// Own socket
+						 onTopicData,						// Text of message
+						 strlen(onTopicData),				// Message size
 						 0,									// No flags
 						 (SOCKADDR *)&clientAddress,		// Address structure of server (type, IP address and port)
 						 sizeof(clientAddress));			// Size of sockadr_in structure
@@ -292,9 +357,84 @@ void ChAuto::FSM_Ch_Share_Topic_Data(){
 }
 
 
-void ChAuto::FSM_Ch_Share_All_Data(){
-	SetState(FSM_Ch_Share_All_Data_State);
+void ChAuto::FSM_Ch_Share_All_Topics(){
+	SetState(FSM_Ch_Share_All_Topics_State);
+	
+	char allTopicBuffer[BUFFER_SIZE];	
+	int k = 0;
+
+	for(int i = 0; i < publisherCounter; i++){
+		for(int j = 0; j < strlen(allServerData[i]); j++){
+			if((allServerData[i])[j] == ':'){					// Until ':' is reached, topic name is being copied
+				allTopicBuffer[k++] = '\n';					
+				break;
+			}else{
+				allTopicBuffer[k] = (allServerData[i])[j];		// Continue appending after finishing first topic
+				k++;
+			}
+		}
+	}
+
+ 	allTopicBuffer[k++] = '`';								// Caracter which will be used to adress the end of message
+	allTopicBuffer[k++] = '\0';
+
+	iResult = sendto(serverSocket,							// Own socket
+						 allTopicBuffer,						// Text of message
+						 strlen(allTopicBuffer),				// Message size
+						 0,									// No flags
+						 (SOCKADDR *)&clientAddress,		// Address structure of server (type, IP address and port)
+						 sizeof(clientAddress));			// Size of sockadr_in structure
+
+	// Check if message is succesfully sent. If not, close client application
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("sendto failed with error: %d\n", WSAGetLastError());
+		closesocket(serverSocket);
+		WSACleanup();
+		return;
+	}
+
+	PrepareNewMessage(0x00, MSG_Stay_Connected);
+	SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
+	SetMsgObjectNumberTo(0);
+	SendMessage(CH_AUTOMATE_MBX_ID);
 }
+
+void ChAuto::FSM_Ch_Publish_ACK(){
+	SetState(FSM_Ch_Publish_ACK_State);
+
+	char ackMessageTmp[BUFFER_SIZE];
+	int i;
+
+	for(i = 0; i < strlen(ackMessageTmp); i++){
+		ackMessageTmp[i] = ackMessage[i];
+	}
+	ackMessageTmp[++i] = '\0';
+	
+	iResult = sendto(serverSocket,							// Own socket
+						 ackMessage,						// Text of message
+						 strlen(ackMessage),				// Message size
+						 0,									// No flags
+						 (SOCKADDR *)&clientAddress,		// Address structure of server (type, IP address and port)
+						 sizeof(clientAddress));			// Size of sockadr_in structure
+
+	// Check if message is succesfully sent. If not, close client application
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("sendto failed with error: %d\n", WSAGetLastError());
+		closesocket(serverSocket);
+		WSACleanup();
+		return;
+	}
+
+	printf("ACK sent to Publisher.\n\n");
+
+	PrepareNewMessage(0x00, MSG_Stay_Connected);
+	SetMsgToAutomate(CH_AUTOMATE_TYPE_ID);
+	SetMsgObjectNumberTo(0);
+	SendMessage(CH_AUTOMATE_MBX_ID);
+}
+
 
 void ChAuto::FSM_Ch_Idle_Cl_Failed(){
 	SetState(FSM_Ch_Idle);

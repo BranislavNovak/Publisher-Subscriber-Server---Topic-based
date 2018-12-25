@@ -9,11 +9,12 @@
 //#pragma comment (lib, "Ws2_32.lib")
 
 #define SERVER_PORT 27015	// Port number of server that will be used for communication with clients
-#define BUFFER_SIZE 512		// Size of buffer that will be used for sending and receiving messages to clients
+#define BUFFER_SIZE 1024		// Size of buffer that will be used for sending and receiving messages to clients
 #define TOPIC_BUFFER_SIZE 50
 #define FIRST_LETTER_OF_TOPIC 4
-#define PUBLISHED_DATA 200
+#define PUBLISHED_DATA 100
 #define NUMBER_OF_TOPICS 20
+#define MAX_PUBLISHERS 10
 
 class ChAuto : public FiniteStateMachine {
 	
@@ -36,7 +37,8 @@ class ChAuto : public FiniteStateMachine {
 						FSM_Ch_Connected, 
 						FSM_Ch_Share_Data_on_Topic,
 						FSM_Ch_Store_Data,
-						FSM_Ch_Share_All_Data_State};
+						FSM_Ch_Share_All_Topics_State,
+						FSM_Ch_Publish_ACK_State};
 
 	//FSM_Ch_Idle
 	void	FSM_Ch_Idle_Cl_Connection_Request();
@@ -50,9 +52,10 @@ class ChAuto : public FiniteStateMachine {
 
 	void	FSM_Ch_Idle_Cl_Connected();
 	void	FSM_Ch_Idle_Cl_Failed();
-	void	FSM_Ch_Share_All_Data();
+	void	FSM_Ch_Share_All_Topics();
 	void	FSM_Ch_Share_Topic_Data();
 	void	FSM_Ch_Store_Data_SubPub();
+	void	FSM_Ch_Publish_ACK();
 		
 public:
 	ChAuto();

@@ -15,7 +15,7 @@
 
 #define SERVER_IP_ADDRESS "0:0:0:0:0:0:0:1"	// IPv6 address of server in localhost
 #define SERVER_PORT 27015					// Port number of server that will be used for communication with clients
-#define BUFFER_SIZE 512						// Size of buffer that will be used for sending and receiving messages to client
+#define BUFFER_SIZE 1024					// Size of buffer that will be used for sending and receiving messages to client
 
 
 int main()
@@ -69,7 +69,7 @@ int main()
 	
 	while(1)
 	{
-		printf("Enter message to send:\n");
+		printf("\n-----> Enter message to send: ");
 
 		// Read string from user into outgoing buffer
 		gets_s(dataBuffer, BUFFER_SIZE);
@@ -91,8 +91,6 @@ int main()
 			return 1;
 		}
 
-		printf("Received from server:\n");
-
 		iResult = recvfrom(clientSocket,						// Own socket
 			            dataBuffer,							// Buffer that will be used for receiving message
 						BUFFER_SIZE,							// Maximal size of buffer
@@ -103,7 +101,7 @@ int main()
 		// Check if message is succesfully sent. If not, close client application
 		if (iResult == SOCKET_ERROR)
 		{
-			printf("sendto failed with error: %d\n", WSAGetLastError());
+			printf("recvfrom failed with error: %d\n", WSAGetLastError());
 			closesocket(clientSocket);
 			WSACleanup();
 			return 1;
@@ -116,8 +114,15 @@ int main()
         
 		// Convert port number from network byte order to host byte order
 		clientPort = ntohs(serverAddress.sin6_port);
-
-		printf("Hello from server to %s IpAddress, %d Port.\n", ipAddress, clientPort);
+		
+		printf("\n***** Received from server *****\n");
+		for(int i = 0; i < strlen(dataBuffer); i++){
+			if(dataBuffer[i] != '`'){								// When client reaches caracter that adresses end of message
+				printf("%c", dataBuffer[i]);
+			}else{
+				break;
+			}
+		}
 
 	}
 	// Only for demonstration purpose

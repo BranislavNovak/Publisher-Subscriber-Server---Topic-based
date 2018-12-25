@@ -1,9 +1,5 @@
-﻿Build started 24.12.2018 16:45:51.
-     1>Project "D:\MRKiRM1_pub_sub_server\Publisher-Subscriber-Server---Topic-based\Publisher Subscriber server\Publisher_Subscriber_server\POP3ClientCppUnit\POP3ClientCppUnit.vcxproj" on node 2 (clean target(s)).
-     1>_PrepareForClean:
-         Deleting file "Debug\PublisherSubscriberServer.lastbuildstate".
-     1>Done Building Project "D:\MRKiRM1_pub_sub_server\Publisher-Subscriber-Server---Topic-based\Publisher Subscriber server\Publisher_Subscriber_server\POP3ClientCppUnit\POP3ClientCppUnit.vcxproj" (clean target(s)).
+﻿Build started 25-Dec-18 01:53:44.
 
 Build succeeded.
 
-Time Elapsed 00:00:00.03
+Time Elapsed 00:00:00.00
